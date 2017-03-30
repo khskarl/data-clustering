@@ -18,6 +18,12 @@
 
 (def dimension 50)
 
+(defn random-position []
+  [(rand-int dimension) (rand-int dimension)])
+
+(defn random-in-dimension []
+  (rand-int dimension))
+
 (defn wrap [x]
   (mod x dimension))
 
@@ -46,7 +52,18 @@
   (:occupied-by (deref (get-tile-ref dead-grid [i j]))))
 
 ;; Ants
-(defstruct ant-struct :x :y :carrying)
+(defstruct ant-struct :x :y :carrying :tx :ty)
+
+(defn next-movement [ant]
+  (let [dx (- (:x ant) (:tx ant))
+        dy (- (:y ant) (:ty ant))]
+    (if (> (Math/abs dx) (Math/abs dy))
+      (if (> 0 dx)
+        (:right direction-id-map-delta)
+        (:left direction-id-map-delta))
+      (if (> 0 dy)
+        (:up direction-id-map-delta)
+        (:down direction-id-map-delta)))))
 
 (defn is-ant-carrying?
   [ant]
@@ -56,7 +73,7 @@
   [[i j]]
   (let [tile-ref (get-tile-ref alive-grid [i j])
         tile     @tile-ref
-        ant-ref (ref (struct ant-struct j i nil))] 
+        ant-ref (ref (struct ant-struct j i nil (random-in-dimension) (random-in-dimension)))] 
     (ref-set tile-ref (-> tile
                           (assoc :is-busy true)
                           (assoc :occupied-by ant-ref)))
@@ -79,7 +96,7 @@
 
 (def radius 1)
 (def max-neighbors (dec (* (inc (* 2 radius)) (inc (* 2 radius)))))
-(def num-ants 30)
+(def num-ants 40)
 (def ants (create-ants num-ants))
 
 ;; Bodies
@@ -109,7 +126,7 @@
                   (recur num-bodies-left new-bodies)
                   (recur (dec num-bodies-left) (conj new-bodies (create-body [i j])))))))))
 
-(def num-bodies 450)
+(def num-bodies 300)
 (def bodies (create-bodies num-bodies))
 
 (defn has-body-below-ant? [ant]
@@ -124,7 +141,14 @@
         :when (not (and (= i i0) (= j j0)))]
     [(wrap i)  (wrap j)]))
 
-(get-neighbors-indices [5 5])
+(defn has-reached-target? [ant-ref]
+  (and (= (:x @ant-ref) (:tx @ant-ref))
+       (= (:y @ant-ref) (:ty @ant-ref))))
+
+(defn compute-new-target-position [ant-ref]
+  (let [new-target (random-position)]
+    (alter ant-ref assoc :tx (first new-target))
+    (alter ant-ref assoc :ty (second new-target))))
 
 (defn count-body-neighbors
   [[i j]]
@@ -149,38 +173,35 @@
     (float (/ num-neighbors max-neighbors))))
 
 (defn move-ant!
-  [ant [dx dy]]
-  (dosync
-   (let [x (:x @ant)
-         y (:y @ant)
-         new-x (wrap (+ x dx))
-         new-y (wrap (+ y dy))]
-     (if (is-tile-free? alive-grid [new-y new-x])
-       (let [tile-ref (get-tile-ref alive-grid [y x])
-             tile     @tile-ref
-             next-tile-ref (get-tile-ref alive-grid [new-y new-x])
-             next-tile     @next-tile-ref]
-         (alter tile-ref      assoc :is-busy false)
-         (alter next-tile-ref assoc :is-busy true)
-         (alter ant assoc :x new-x)
-         (alter ant assoc :y new-y))
-       ant))))
+  [ant-ref [dx dy]] 
+  (let [x (:x @ant-ref)
+        y (:y @ant-ref)
+        new-x (wrap (+ x dx))
+        new-y (wrap (+ y dy))]
+    (if (is-tile-free? alive-grid [new-y new-x])
+      (let [tile-ref (get-tile-ref alive-grid [y x])
+            tile     @tile-ref
+            next-tile-ref (get-tile-ref alive-grid [new-y new-x])
+            next-tile     @next-tile-ref]
+        (alter tile-ref      assoc :is-busy false)
+        (alter next-tile-ref assoc :is-busy true)
+        (alter ant-ref assoc :x new-x)
+        (alter ant-ref assoc :y new-y)
+        (if (has-reached-target? ant-ref)
+          (compute-new-target-position ant-ref))))))
 
 (defn pick-body!
   [ant-ref body-ref]
   (let [i (:y (deref body-ref))
         j (:x (deref body-ref))
-        tile-ref (get-tile-ref dead-grid [i j])]
-    (dosync
-     (alter tile-ref assoc :occupied-by nil)
-     (alter tile-ref assoc :is-busy false)
-     (alter body-ref assoc :x dimension)
-     (alter body-ref assoc :y dimension)
-     (alter ant-ref  assoc :carrying body-ref)
-     )))
+        tile-ref (get-tile-ref dead-grid [i j])] 
+    (alter tile-ref assoc :occupied-by nil)
+    (alter tile-ref assoc :is-busy false)
+    (alter body-ref assoc :x dimension)
+    (alter body-ref assoc :y dimension)
+    (alter ant-ref  assoc :carrying body-ref)))
 
 (defn pick-body-below!
-  ""
   [ant-ref]
   (let [i (:y @ant-ref)
         j (:x @ant-ref)
@@ -192,33 +213,32 @@
   (let [i (:y @ant-ref)
         j (:x @ant-ref)
         tile-ref (get-tile-ref dead-grid [i j])
-        body-ref (:carrying (deref ant-ref))]
-    (dosync
-     (alter tile-ref assoc :occupied-by body-ref)
-     (alter tile-ref assoc :is-busy true)
-     (alter body-ref assoc :x j)
-     (alter body-ref assoc :y i)
-     (alter ant-ref assoc :carrying nil))))
+        body-ref (:carrying (deref ant-ref))] 
+    (alter tile-ref assoc :occupied-by body-ref)
+    (alter tile-ref assoc :is-busy true)
+    (alter body-ref assoc :x j)
+    (alter body-ref assoc :y i)
+    (alter ant-ref  assoc :carrying nil)))
 
 (defn iterate-ant
   [ant-ref]
-  (let [i (:y @ant-ref)
-        j (:x @ant-ref)
-        has-body-below (has-body-below-ant? @ant-ref)
-        is-carrying (is-ant-carrying? @ant-ref)
-        chance (rand)]
-    (if (and is-carrying
-             (not has-body-below)
-             (>= (chance-to-drop @ant-ref) chance)) 
-      (drop-body-below! ant-ref)
-      (if (and (not is-carrying)
-               has-body-below
-               (>= (chance-to-pick @ant-ref) chance))
-        (pick-body-below! ant-ref))))
-  (move-ant! ant-ref (random-direction)) 
-  ;; (move-ant! ant-ref [0 1])
-  )
+  (dosync
+   (let [i (:y @ant-ref)
+         j (:x @ant-ref)
+         has-body-below (has-body-below-ant? @ant-ref)
+         is-carrying (is-ant-carrying? @ant-ref)
+         chance (rand)]
+     (if (and is-carrying
+              (not has-body-below)
+              (>= (chance-to-drop @ant-ref) chance)) 
+       (drop-body-below! ant-ref)
+       (if (and (not is-carrying)
+                has-body-below
+                (>= (chance-to-pick @ant-ref) chance))
+         (pick-body-below! ant-ref))))
+   (let [delta-movement (next-movement @ant-ref)]
+     (move-ant! ant-ref delta-movement))))
 
 (defn iterate-system []
-  (run! iterate-ant ants))
+  (doall (pmap iterate-ant ants)))
 

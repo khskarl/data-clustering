@@ -30,6 +30,7 @@
   (q/stroke-weight 0)
   (q/smooth)
   (q/frame-rate 60)
+  (q/text-font (q/create-font "DejaVu Sans" 10 true))
   )
 
 (defn draw []
@@ -39,6 +40,7 @@
   (q/fill (q/color 230))
   (draw-entities (map entity-to-position ac/ants))
   (ac/iterate-system)
+  (q/text "Hi there" 0 0)  
   )
 
 
