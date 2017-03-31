@@ -33,8 +33,7 @@
   (q/stroke-weight 0)
   (q/smooth)
   (q/frame-rate 60)
-  (q/text-font (q/create-font "DejaVu Sans" 10 true))
-  )
+  (q/text-font (q/create-font "DejaVu Sans" 10 true)))
 
 (defn normal-distribution [x]
   (let [sigma 0.38]
@@ -68,6 +67,7 @@
   (q/text (str @current-iteration) 0 (- dimensions 10))  
   )
 
+()
 
 (q/defsketch data-clustering               
   :title "Dataaaaaaa"
@@ -77,3 +77,4 @@
   :size [dimensions dimensions])   
 
 (defn -main [] )
+

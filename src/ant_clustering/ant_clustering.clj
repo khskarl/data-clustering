@@ -7,6 +7,8 @@
 ;; 3) Tomada de decisão (problema)
 ;; 4) Ajuste de parâmetros
 
+;; TODO: Add neighbors indices map computed from radius
+
 (def direction-to-delta-movement
   {:up    [ 0  1]
    :right [ 1  0]
@@ -102,7 +104,7 @@
 
 (def radius 1)
 (def max-neighbors (dec (* (inc (* 2 radius)) (inc (* 2 radius)))))
-(def num-ants 50)
+(def num-ants 30)
 (def ants (create-ants num-ants))
 
 ;; Bodies
@@ -175,14 +177,14 @@
   (let [i (:y ant)
         j (:x ant)
         num-neighbors (count-body-neighbors [i j])]
-    (- 1 (float (/ num-neighbors max-neighbors)))))
+    (- 1 (normal-distribution (float (/ num-neighbors max-neighbors))))))
 
 (defn chance-to-drop
   [ant]
   (let [i (:y ant)
         j (:x ant)
         num-neighbors (count-body-neighbors [i j])]
-    (float (/ num-neighbors max-neighbors))))
+    (normal-distribution (float (/ num-neighbors max-neighbors)))))
 
 (defn move-ant!
   [ant-ref [dx dy]] 
@@ -218,6 +220,7 @@
   (let [i (:y @ant-ref)
         j (:x @ant-ref)
         body-below (get-body-ref-in-pos [i j])]
+    ;; (println "Pick body!")
     (pick-body! ant-ref body-below)))
 
 (defn drop-body-below!
@@ -225,7 +228,8 @@
   (let [i (:y @ant-ref)
         j (:x @ant-ref)
         tile-ref (get-tile-ref dead-grid [i j])
-        body-ref (:carrying (deref ant-ref))] 
+        body-ref (:carrying (deref ant-ref))]
+    ;; (println "Drop body!")
     (alter tile-ref assoc :occupied-by body-ref)
     (alter tile-ref assoc :is-busy true)
     (alter body-ref assoc :x j)
@@ -239,14 +243,18 @@
          j (:x @ant-ref)
          has-body-below (has-body-below-ant? @ant-ref)
          is-carrying (is-ant-carrying? @ant-ref)
-         chance (rand)]
+         chance (rand)
+         drop-chance (chance-to-drop @ant-ref)
+         pick-chance (chance-to-pick @ant-ref)]
+     ;; (println "drop chance" drop-chance)
+     ;; (println "pick chance" pick-chance)
      (if (and is-carrying
               (not has-body-below)
-              (>= (normal-distribution (chance-to-drop @ant-ref)) chance)) 
+              (>= drop-chance chance)) 
        (drop-body-below! ant-ref)
        (if (and (not is-carrying)
                 has-body-below
-                (>= (chance-to-pick @ant-ref) (* chance chance)))
+                (>= pick-chance chance))
          (pick-body-below! ant-ref))))
    (let [delta-movement ((randomize-direction (next-direction @ant-ref)) direction-to-delta-movement)]
      (move-ant! ant-ref delta-movement))))
