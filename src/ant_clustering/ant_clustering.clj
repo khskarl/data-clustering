@@ -7,16 +7,22 @@
 ;; 3) Tomada de decisão (problema)
 ;; 4) Ajuste de parâmetros
 
-(def direction-id-map-delta
+(def direction-to-delta-movement
   {:up    [ 0  1]
    :right [ 1  0]
    :down  [ 0 -1]
    :left  [-1  0]})
 
 (defn random-direction []
-  ((rand-nth [:up :right :down :left]) direction-id-map-delta))
+  ((rand-nth [:up :right :down :left]) direction-to-delta-movement))
 
-(def dimension 50)
+(defn randomize-direction [direction]
+  (rand-nth (direction {:up    [:up :up :left :right]
+                        :right [:right :right :up :down]
+                        :down  [:down :down :right :left]
+                        :left  [:left :left :up :down]})))
+
+(def dimension 100)
 
 (defn random-position []
   [(rand-int dimension) (rand-int dimension)])
@@ -54,16 +60,16 @@
 ;; Ants
 (defstruct ant-struct :x :y :carrying :tx :ty)
 
-(defn next-movement [ant]
+(defn next-direction [ant]
   (let [dx (- (:x ant) (:tx ant))
         dy (- (:y ant) (:ty ant))]
     (if (> (Math/abs dx) (Math/abs dy))
       (if (> 0 dx)
-        (:right direction-id-map-delta)
-        (:left direction-id-map-delta))
+        :right
+        :left)
       (if (> 0 dy)
-        (:up direction-id-map-delta)
-        (:down direction-id-map-delta)))))
+        :up
+        :down))))
 
 (defn is-ant-carrying?
   [ant]
@@ -96,7 +102,7 @@
 
 (def radius 1)
 (def max-neighbors (dec (* (inc (* 2 radius)) (inc (* 2 radius)))))
-(def num-ants 40)
+(def num-ants 50)
 (def ants (create-ants num-ants))
 
 ;; Bodies
@@ -126,7 +132,7 @@
                   (recur num-bodies-left new-bodies)
                   (recur (dec num-bodies-left) (conj new-bodies (create-body [i j])))))))))
 
-(def num-bodies 300)
+(def num-bodies 1200)
 (def bodies (create-bodies num-bodies))
 
 (defn has-body-below-ant? [ant]
@@ -158,6 +164,12 @@
 ;; TODO: Implement normal distribution
 ;; (exp( -(x)^2 / (2 * 0.399^2) ) / sqrt(2*pi* 0.399^2) )
 
+
+(defn normal-distribution [x]
+  (let [sigma 0.38]
+    (- 1 (/ (Math/pow Math/E (- (/ (* x x) (* 2 sigma sigma)))) (Math/sqrt (* 2 Math/PI sigma sigma))))))
+
+
 (defn chance-to-pick
   [ant]
   (let [i (:y ant)
@@ -178,7 +190,7 @@
         y (:y @ant-ref)
         new-x (wrap (+ x dx))
         new-y (wrap (+ y dy))]
-    (if (is-tile-free? alive-grid [new-y new-x])
+    (if true
       (let [tile-ref (get-tile-ref alive-grid [y x])
             tile     @tile-ref
             next-tile-ref (get-tile-ref alive-grid [new-y new-x])
@@ -230,13 +242,13 @@
          chance (rand)]
      (if (and is-carrying
               (not has-body-below)
-              (>= (chance-to-drop @ant-ref) chance)) 
+              (>= (normal-distribution (chance-to-drop @ant-ref)) chance)) 
        (drop-body-below! ant-ref)
        (if (and (not is-carrying)
                 has-body-below
-                (>= (chance-to-pick @ant-ref) chance))
+                (>= (chance-to-pick @ant-ref) (* chance chance)))
          (pick-body-below! ant-ref))))
-   (let [delta-movement (next-movement @ant-ref)]
+   (let [delta-movement ((randomize-direction (next-direction @ant-ref)) direction-to-delta-movement)]
      (move-ant! ant-ref delta-movement))))
 
 (defn iterate-system []
