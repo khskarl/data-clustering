@@ -4,12 +4,18 @@
             [quil.helpers.seqs :as qs]
             [quil.helpers.calc :as qc]
             [ant-clustering.ant-clustering :as ac]
+            [taoensso.tufte :as tufte :refer (defnp p profiled profile)]
             [clojure.pprint :as pprint]))
+
+(tufte/add-basic-println-handler! {})
+
+(profile {} (dotimes [_ 500]
+              (ac/iterate-system)))
 
 (def dimensions 400)
 (def tile-size (/ dimensions ac/dimension))
 (def half-tile-size (/ tile-size 2))
-(def iterations-per-frame 100)
+(def iterations-per-frame 20)
 
 (def current-iteration (atom 0))
 
@@ -37,7 +43,8 @@
 
 (defn normal-distribution [x]
   (let [sigma 0.38]
-    (- 1 (/ (Math/pow Math/E (- (/ (* x x) (* 2 sigma sigma)))) (Math/sqrt (* 2 Math/PI sigma sigma))))))
+    (- 1 (/ (Math/pow Math/E (- (/ (* x x) (* 2 sigma sigma))))
+            (Math/sqrt (* 2 Math/PI sigma sigma))))))
 
 (defn draw-gaussian []
   (q/fill 200 150 125)

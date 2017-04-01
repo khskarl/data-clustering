@@ -1,6 +1,7 @@
 (ns ant-clustering.ant-clustering
-  (:gen-class)
-  (:require clojure.pprint))
+  (:gen-class)  
+  (:require clojure.pprint 
+            [taoensso.tufte :as tufte :refer (defnp p profiled profile)]))
 
 ;; 1) Fazer leitura dos dados pra formiguinhas mortas
 ;; 2) Jogar formiguinhas mortas no mapa
@@ -102,9 +103,9 @@
                   (recur (dec num-ants-left)
                          (conj new-ants (create-ant [i j])))))))))
 
-(def radius 1)
+(def radius 2)
 (def max-neighbors (dec (* (inc (* 2 radius)) (inc (* 2 radius)))))
-(def num-ants 30)
+(def num-ants 25)
 (def ants (create-ants num-ants))
 
 ;; Bodies
@@ -142,12 +143,22 @@
         j (:x ant)] 
     (is-tile-busy? dead-grid [i j])))
 
-(defn get-neighbors-indices
+(defn compute-neighbors-indices
   [[i0 j0]]
   (for [i (range (- i0 radius) (inc (+ i0 radius)))
         j (range (- j0 radius) (inc (+ j0 radius)))
         :when (not (and (= i i0) (= j j0)))]
     [(wrap i)  (wrap j)]))
+
+
+(def neighbors-indices (apply vector (map (fn [i]
+                                            (apply vector (map (fn [j]
+                                                                 (compute-neighbors-indices [i j]))
+                                                               (range dimension))))
+                                          (range dimension))))
+(defn get-neighbors-indices
+  [[i j]]
+  (get-in neighbors-indices [i j]))
 
 (defn has-reached-target? [ant-ref]
   (and (= (:x @ant-ref) (:tx @ant-ref))
@@ -160,8 +171,9 @@
 
 (defn count-body-neighbors
   [[i j]]
-  (count (filter #(:is-busy %)
-                 (map #(deref (get-tile-ref dead-grid %)) (get-neighbors-indices [i j])))))
+  (p ::count-body-neighbors (count (filter #(:is-busy %)
+                                           (map #(deref (get-tile-ref dead-grid %))
+                                                (get-neighbors-indices [i j]))))))
 
 ;; TODO: Implement normal distribution
 ;; (exp( -(x)^2 / (2 * 0.399^2) ) / sqrt(2*pi* 0.399^2) )
@@ -173,18 +185,12 @@
 
 
 (defn chance-to-pick
-  [ant]
-  (let [i (:y ant)
-        j (:x ant)
-        num-neighbors (count-body-neighbors [i j])]
-    (- 1 (normal-distribution (float (/ num-neighbors max-neighbors))))))
+  [num-neighbors] 
+  (- 1 (float (/ num-neighbors max-neighbors))))
 
 (defn chance-to-drop
-  [ant]
-  (let [i (:y ant)
-        j (:x ant)
-        num-neighbors (count-body-neighbors [i j])]
-    (normal-distribution (float (/ num-neighbors max-neighbors)))))
+  [num-neighbors] 
+  (float (/ num-neighbors max-neighbors)))
 
 (defn move-ant!
   [ant-ref [dx dy]] 
@@ -206,8 +212,8 @@
 
 (defn pick-body!
   [ant-ref body-ref]
-  (let [i (:y (deref body-ref))
-        j (:x (deref body-ref))
+  (let [i (:y @body-ref)
+        j (:x @body-ref)
         tile-ref (get-tile-ref dead-grid [i j])] 
     (alter tile-ref assoc :occupied-by nil)
     (alter tile-ref assoc :is-busy false)
@@ -244,8 +250,9 @@
          has-body-below (has-body-below-ant? @ant-ref)
          is-carrying (is-ant-carrying? @ant-ref)
          chance (rand)
-         drop-chance (chance-to-drop @ant-ref)
-         pick-chance (chance-to-pick @ant-ref)]
+         num-neighbors (count-body-neighbors [i j])
+         drop-chance (chance-to-drop num-neighbors)
+         pick-chance (chance-to-pick num-neighbors)]
      ;; (println "drop chance" drop-chance)
      ;; (println "pick chance" pick-chance)
      (if (and is-carrying
@@ -254,11 +261,11 @@
        (drop-body-below! ant-ref)
        (if (and (not is-carrying)
                 has-body-below
-                (>= pick-chance chance))
+                (>= (* pick-chance pick-chance) chance))
          (pick-body-below! ant-ref))))
    (let [delta-movement ((randomize-direction (next-direction @ant-ref)) direction-to-delta-movement)]
      (move-ant! ant-ref delta-movement))))
 
 (defn iterate-system []
-  (doall (pmap iterate-ant ants)))
+  (doall (map iterate-ant ants)))
 
