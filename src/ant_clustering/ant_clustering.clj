@@ -8,7 +8,10 @@
 ;; 3) Tomada de decisão (problema)
 ;; 4) Ajuste de parâmetros
 
-;; TODO: Add neighbors indices map computed from radius
+(def dimension 100)
+(def radius 2)
+(def num-ants 25)
+(def num-bodies 1500)
 
 (def direction-to-delta-movement
   {:up    [ 0  1]
@@ -16,22 +19,17 @@
    :down  [ 0 -1]
    :left  [-1  0]})
 
-(defn random-direction []
-  ((rand-nth [:up :right :down :left]) direction-to-delta-movement))
-
 (defn randomize-direction [direction]
-  (rand-nth (direction {:up    [:up :up :left :right]
-                        :right [:right :right :up :down]
-                        :down  [:down :down :right :left]
-                        :left  [:left :left :up :down]})))
-
-(def dimension 100)
-
-(defn random-position []
-  [(rand-int dimension) (rand-int dimension)])
+  (rand-nth (direction {:up    [:up :up :up :left :right]
+                        :right [:right :right :right :up :down]
+                        :down  [:down :down :down :right :left]
+                        :left  [:left :left :left :up :down]})))
 
 (defn random-in-dimension []
   (rand-int dimension))
+
+(defn random-position []
+  [(random-in-dimension) (random-in-dimension)])
 
 (defn wrap [x]
   (mod x dimension))
@@ -55,7 +53,6 @@
 (defstruct tile-struct :is-busy :occupied-by)
 
 (def dead-grid  (make-grid dimension #(ref (struct tile-struct false nil))))
-(def alive-grid (make-grid dimension #(ref (struct tile-struct false nil))))
 
 (defn get-body-ref-in-pos [[i j]]
   (:occupied-by (deref (get-tile-ref dead-grid [i j]))))
@@ -63,7 +60,7 @@
 ;; Ants
 (defstruct ant-struct :x :y :carrying :tx :ty)
 
-(defn next-direction [ant]
+(defn compute-next-direction [ant]
   (let [dx (- (:x ant) (:tx ant))
         dy (- (:y ant) (:ty ant))]
     (if (> (Math/abs dx) (Math/abs dy))
@@ -80,26 +77,22 @@
 
 (defn create-ant
   [[i j]]
-  (let [ant-ref (ref (struct ant-struct j i nil (random-in-dimension) (random-in-dimension)))] 
-    ant-ref))
+  (ref (struct ant-struct j i nil (random-in-dimension) (random-in-dimension))))
 
 (defn create-ants
   [num-ants]
-  (dosync (loop [num-ants-left num-ants
-                 new-ants []]
-            (if (zero? num-ants-left)
-              new-ants
-              (let [i (rand-int dimension)
-                    j (rand-int dimension)
-                    tile-busy (is-tile-busy? alive-grid [i j])]
-                (if tile-busy
-                  (recur num-ants-left new-ants)
-                  (recur (dec num-ants-left)
-                         (conj new-ants (create-ant [i j])))))))))
+  (dosync
+   (loop [num-ants-left num-ants
+          new-ants []]
+     (if (zero? num-ants-left)
+       new-ants
+       (let [i (rand-int dimension)
+             j (rand-int dimension)]                
+         (recur (dec num-ants-left)
+                (conj new-ants (create-ant [i j]))))))))
 
-(def radius 2)
+
 (def max-neighbors (dec (* (inc (* 2 radius)) (inc (* 2 radius)))))
-(def num-ants 25)
 (def ants (create-ants num-ants))
 
 ;; Bodies
@@ -129,7 +122,6 @@
                   (recur num-bodies-left new-bodies)
                   (recur (dec num-bodies-left) (conj new-bodies (create-body [i j])))))))))
 
-(def num-bodies 1200)
 (def bodies (create-bodies num-bodies))
 
 (defn has-body-below-ant? [ant]
@@ -165,9 +157,8 @@
 
 (defn count-body-neighbors
   [[i j]]
-  (p ::count-body-neighbors (count (filter #(:is-busy %)
-                                           (map #(deref (get-tile-ref dead-grid %))
-                                                (get-neighbors-indices [i j]))))))
+  (p ::count-body-neighbors (count (filter #(:is-busy (deref (get-tile-ref dead-grid %)))
+                                           (get-neighbors-indices [i j])))))
 
 (defn chance-to-pick
   [num-neighbors] 
@@ -183,20 +174,17 @@
         y (:y @ant-ref)
         new-x (wrap (+ x dx))
         new-y (wrap (+ y dy))]    
-    (alter ant-ref assoc :x new-x)
-    (alter ant-ref assoc :y new-y)
     (if (has-reached-target? ant-ref)
-      (compute-new-target-position ant-ref))))
+      (compute-new-target-position ant-ref))
+    (alter ant-ref assoc :x new-x :y new-y)))
 
 (defn pick-body!
   [ant-ref body-ref]
   (let [i (:y @body-ref)
         j (:x @body-ref)
         tile-ref (get-tile-ref dead-grid [i j])] 
-    (alter tile-ref assoc :occupied-by nil)
-    (alter tile-ref assoc :is-busy false)
-    (alter body-ref assoc :x dimension)
-    (alter body-ref assoc :y dimension)
+    (alter tile-ref assoc :occupied-by nil :is-busy false)
+    (alter body-ref assoc :x dimension :y dimension)
     (alter ant-ref  assoc :carrying body-ref)))
 
 (defn pick-body-below!
@@ -211,20 +199,18 @@
   (let [i (:y @ant-ref)
         j (:x @ant-ref)
         tile-ref (get-tile-ref dead-grid [i j])
-        body-ref (:carrying (deref ant-ref))]
+        body-ref (:carrying @ant-ref)]
     ;; (println "Drop body!")
-    (alter tile-ref assoc :occupied-by body-ref)
-    (alter tile-ref assoc :is-busy true)
-    (alter body-ref assoc :x j)
-    (alter body-ref assoc :y i)
+    (alter tile-ref assoc :occupied-by body-ref :is-busy true)
+    (alter body-ref assoc :x j :y i)
     (alter ant-ref  assoc :carrying nil)))
 
 ;; TODO: Maybe change Ants to agents (or something else) so it can be used outside a dosync
 ;; TODO: read more about paralellism in clojure
 ;; TODO: check rich's ants
 
-(defn iterate-ant
-  [ant-ref] 
+(defn decide-ant
+  [ant-ref]   
   (dosync
    (let [i (:y @ant-ref)
          j (:x @ant-ref)
@@ -241,10 +227,16 @@
          (if (and has-body-below
                   (>= (* pick-chance pick-chance) chance))
            (pick-body-below! ant-ref))))
-     (let [delta-movement ((randomize-direction (next-direction @ant-ref)) direction-to-delta-movement)]
-       (move-ant! ant-ref delta-movement))))
+     ))
   )
 
-(defn iterate-system []
-  (doall (pmap iterate-ant ants)))
+(defn walk-ant [ant-ref]
+  (dosync
+   (let [new-direction (randomize-direction (compute-next-direction @ant-ref))
+         delta-movement (new-direction direction-to-delta-movement)]
+     (move-ant! ant-ref delta-movement))))
+
+(defn iterate-system [] 
+  (doall (pmap walk-ant ants))
+  (doall (pmap decide-ant ants)))
 

@@ -12,7 +12,7 @@
 ;; (profile {} (dotimes [_ 500]
 ;;               (ac/iterate-system)))
 
-(def dimensions 400)
+(def dimensions 500)
 (def tile-size (/ dimensions ac/dimension))
 (def half-tile-size (/ tile-size 2))
 (def iterations-per-frame 30)
