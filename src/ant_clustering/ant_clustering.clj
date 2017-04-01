@@ -1,6 +1,7 @@
 (ns ant-clustering.ant-clustering
   (:gen-class)  
-  (:require clojure.pprint 
+  (:require [ant-clustering.dataset :as dataset]
+            clojure.pprint 
             [taoensso.tufte :as tufte :refer (defnp p profiled profile)]))
 
 ;; 1) Fazer leitura dos dados pra formiguinhas mortas
@@ -8,10 +9,18 @@
 ;; 3) Tomada de decisão (problema)
 ;; 4) Ajuste de parâmetros
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Grid, variables and movement ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(def dataset-path "datasets/Square1_DataSet_400itens.txt")
+(def dataset (dataset/load-dataset dataset-path))
+(def dataset-classes (dataset/load-dataset-classes dataset-path))
+
 (def dimension 100)
 (def radius 2)
 (def num-ants 25)
-(def num-bodies 1500)
+(def num-bodies (count dataset))
 
 (def direction-to-delta-movement
   {:up    [ 0  1]
@@ -152,13 +161,12 @@
 
 (defn compute-new-target-position [ant-ref]
   (let [new-target (random-position)]
-    (alter ant-ref assoc :tx (first new-target))
-    (alter ant-ref assoc :ty (second new-target))))
+    (alter ant-ref assoc :tx (first new-target) :ty (second new-target))))
 
 (defn count-body-neighbors
   [[i j]]
-  (p ::count-body-neighbors (count (filter #(:is-busy (deref (get-tile-ref dead-grid %)))
-                                           (get-neighbors-indices [i j])))))
+  (count (filter #(:is-busy (deref (get-tile-ref dead-grid %)))
+                 (get-neighbors-indices [i j]))))
 
 (defn chance-to-pick
   [num-neighbors] 
@@ -226,9 +234,7 @@
        (let [pick-chance (chance-to-pick num-neighbors)]
          (if (and has-body-below
                   (>= (* pick-chance pick-chance) chance))
-           (pick-body-below! ant-ref))))
-     ))
-  )
+           (pick-body-below! ant-ref)))))))
 
 (defn walk-ant [ant-ref]
   (dosync
@@ -239,4 +245,5 @@
 (defn iterate-system [] 
   (doall (pmap walk-ant ants))
   (doall (pmap decide-ant ants)))
+
 
