@@ -9,13 +9,13 @@
 
 (tufte/add-basic-println-handler! {})
 
-(profile {} (dotimes [_ 500]
-              (ac/iterate-system)))
+;; (profile {} (dotimes [_ 500]
+;;               (ac/iterate-system)))
 
 (def dimensions 400)
 (def tile-size (/ dimensions ac/dimension))
 (def half-tile-size (/ tile-size 2))
-(def iterations-per-frame 20)
+(def iterations-per-frame 30)
 
 (def current-iteration (atom 0))
 

@@ -80,16 +80,10 @@
 
 (defn create-ant
   [[i j]]
-  (let [tile-ref (get-tile-ref alive-grid [i j])
-        tile     @tile-ref
-        ant-ref (ref (struct ant-struct j i nil (random-in-dimension) (random-in-dimension)))] 
-    (ref-set tile-ref (-> tile
-                          (assoc :is-busy true)
-                          (assoc :occupied-by ant-ref)))
+  (let [ant-ref (ref (struct ant-struct j i nil (random-in-dimension) (random-in-dimension)))] 
     ant-ref))
 
 (defn create-ants
-  ""
   [num-ants]
   (dosync (loop [num-ants-left num-ants
                  new-ants []]
@@ -175,15 +169,6 @@
                                            (map #(deref (get-tile-ref dead-grid %))
                                                 (get-neighbors-indices [i j]))))))
 
-;; TODO: Implement normal distribution
-;; (exp( -(x)^2 / (2 * 0.399^2) ) / sqrt(2*pi* 0.399^2) )
-
-
-(defn normal-distribution [x]
-  (let [sigma 0.38]
-    (- 1 (/ (Math/pow Math/E (- (/ (* x x) (* 2 sigma sigma)))) (Math/sqrt (* 2 Math/PI sigma sigma))))))
-
-
 (defn chance-to-pick
   [num-neighbors] 
   (- 1 (float (/ num-neighbors max-neighbors))))
@@ -197,18 +182,11 @@
   (let [x (:x @ant-ref)
         y (:y @ant-ref)
         new-x (wrap (+ x dx))
-        new-y (wrap (+ y dy))]
-    (if true
-      (let [tile-ref (get-tile-ref alive-grid [y x])
-            tile     @tile-ref
-            next-tile-ref (get-tile-ref alive-grid [new-y new-x])
-            next-tile     @next-tile-ref]
-        (alter tile-ref      assoc :is-busy false)
-        (alter next-tile-ref assoc :is-busy true)
-        (alter ant-ref assoc :x new-x)
-        (alter ant-ref assoc :y new-y)
-        (if (has-reached-target? ant-ref)
-          (compute-new-target-position ant-ref))))))
+        new-y (wrap (+ y dy))]    
+    (alter ant-ref assoc :x new-x)
+    (alter ant-ref assoc :y new-y)
+    (if (has-reached-target? ant-ref)
+      (compute-new-target-position ant-ref))))
 
 (defn pick-body!
   [ant-ref body-ref]
@@ -226,7 +204,6 @@
   (let [i (:y @ant-ref)
         j (:x @ant-ref)
         body-below (get-body-ref-in-pos [i j])]
-    ;; (println "Pick body!")
     (pick-body! ant-ref body-below)))
 
 (defn drop-body-below!
@@ -242,30 +219,32 @@
     (alter body-ref assoc :y i)
     (alter ant-ref  assoc :carrying nil)))
 
+;; TODO: Maybe change Ants to agents (or something else) so it can be used outside a dosync
+;; TODO: read more about paralellism in clojure
+;; TODO: check rich's ants
+
 (defn iterate-ant
-  [ant-ref]
+  [ant-ref] 
   (dosync
    (let [i (:y @ant-ref)
          j (:x @ant-ref)
          has-body-below (has-body-below-ant? @ant-ref)
          is-carrying (is-ant-carrying? @ant-ref)
          chance (rand)
-         num-neighbors (count-body-neighbors [i j])
-         drop-chance (chance-to-drop num-neighbors)
-         pick-chance (chance-to-pick num-neighbors)]
-     ;; (println "drop chance" drop-chance)
-     ;; (println "pick chance" pick-chance)
-     (if (and is-carrying
-              (not has-body-below)
-              (>= drop-chance chance)) 
-       (drop-body-below! ant-ref)
-       (if (and (not is-carrying)
-                has-body-below
-                (>= (* pick-chance pick-chance) chance))
-         (pick-body-below! ant-ref))))
-   (let [delta-movement ((randomize-direction (next-direction @ant-ref)) direction-to-delta-movement)]
-     (move-ant! ant-ref delta-movement))))
+         num-neighbors (count-body-neighbors [i j])] 
+     (if is-carrying
+       (let [drop-chance (chance-to-drop num-neighbors)]
+         (if (and (not has-body-below)
+                  (>= drop-chance chance)) 
+           (drop-body-below! ant-ref)))
+       (let [pick-chance (chance-to-pick num-neighbors)]
+         (if (and has-body-below
+                  (>= (* pick-chance pick-chance) chance))
+           (pick-body-below! ant-ref))))
+     (let [delta-movement ((randomize-direction (next-direction @ant-ref)) direction-to-delta-movement)]
+       (move-ant! ant-ref delta-movement))))
+  )
 
 (defn iterate-system []
-  (doall (map iterate-ant ants)))
+  (doall (pmap iterate-ant ants)))
 
