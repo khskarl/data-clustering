@@ -12,14 +12,13 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Grid, variables and movement ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(def dataset         (dataset/load-dataset         dataset-path))
-(def dataset-classes (dataset/load-dataset-classes dataset-path))
+(def dataset-data    (dataset/get-data))
+(def dataset-classes (dataset/get-classes))
 
 (def dimension 80)
 (def radius 2)
 (def num-ants 25)
-(def num-bodies (count dataset))
+(def num-bodies (count dataset-data))
 
 (def direction-to-delta-movement
   {:up    [ 0  1]
@@ -108,13 +107,13 @@
 (def ants (create-ants num-ants))
 
 ;; Bodies
-(defstruct body-struct :x :y)
+(defstruct body-struct :id :x :y)
 
 (defn create-body
-  [[i j]]
+  [id [i j]]
   (let [tile-ref (get-tile-ref dead-grid [i j])
         tile     @tile-ref
-        body-ref (ref (struct ant-struct j i))] 
+        body-ref (ref (struct body-struct id j i))] 
     (ref-set tile-ref (-> tile
                           (assoc :is-busy true)
                           (assoc :occupied-by body-ref)))
@@ -131,8 +130,10 @@
                     grid dead-grid
                     tile-busy (is-tile-busy? grid [i j])]
                 (if tile-busy
-                  (recur num-bodies-left new-bodies)
-                  (recur (dec num-bodies-left) (conj new-bodies (create-body [i j])))))))))
+                  (recur num-bodies-left
+                         new-bodies)
+                  (recur (dec num-bodies-left)
+                         (conj new-bodies (create-body (count new-bodies) [i j])))))))))
 
 (def bodies (create-bodies num-bodies))
 
@@ -149,13 +150,13 @@
     [(wrap i)  (wrap j)]))
 
 
-(def neighbors-indices (apply vector (map (fn [i]
-                                            (apply vector (map (fn [j]
-                                                                 (compute-neighbors-indices [i j]))
-                                                               (range dimension))))
+(def neighbors-indices
+  (apply vector (map (fn [i]
+                       (apply vector (map (fn [j]
+                                            (compute-neighbors-indices [i j]))
                                           (range dimension))))
-(defn get-neighbors-indices [[i j]]
-  (get-in neighbors-indices [i j]))
+                     (range dimension))))
+
 
 (defn has-reached-target? [ant-ref]
   (and (= (:x @ant-ref) (:tx @ant-ref))
@@ -165,15 +166,24 @@
   (let [new-target (random-position)]
     (alter ant-ref assoc :tx (first new-target) :ty (second new-target))))
 
+(defn get-neighbors-tile-indices [[i j]]
+  (get-in neighbors-indices [i j]))
+
 (defn get-neighbors [[i j]]
-  (let [neighbors-indices (get-neighbors-indices [i j])
+  (let [neighbors-indices (get-neighbors-tile-indices [i j])
         tiles (filter #(:is-busy (get-tile dead-grid %)) neighbors-indices)]
-    (map :occupied-by tiles)))
+    (map #(:occupied-by (get-tile dead-grid %)) tiles)))
+
+(defn get-neighbors-data [[i j]]
+  (let [neighbors (get-neighbors [i j])]
+    (map #(nth dataset-data (:id (deref %))) neighbors)))
+
+
 
 (defn count-body-neighbors
   [[i j]]
   (count (filter #(:is-busy (get-tile dead-grid %))
-                 (get-neighbors-indices [i j]))))
+                 (get-neighbors-tile-indices [i j]))))
 
 (defn busy-ratio [num-neighbors]
   (float (/ num-neighbors max-neighbors)))
@@ -184,6 +194,43 @@
 (defn chance-to-drop [num-neighbors] 
   (busy-ratio num-neighbors))
 
+(defn move-ant!
+  [ant-ref [dx dy]] 
+  (let [x (:x @ant-ref)
+        y (:y @ant-ref)
+        new-x (wrap (+ x dx))
+        new-y (wrap (+ y dy))]    
+    (if (has-reached-target? ant-ref)
+      (compute-new-target-position ant-ref))
+    (alter ant-ref assoc :x new-x :y new-y)))
+
+(defn pick-body!
+  [ant-ref body-ref]
+  (let [i (:y @body-ref)
+        j (:x @body-ref)
+        tile-ref (get-tile-ref dead-grid [i j])] 
+    (alter tile-ref assoc :occupied-by nil :is-busy false)
+    (alter body-ref assoc :x dimension :y dimension)
+    (alter ant-ref  assoc :carrying body-ref)))
+
+(defn pick-body-below!
+  [ant-ref]
+  (let [i (:y @ant-ref)
+        j (:x @ant-ref)
+        body-below (get-body-ref-in-pos [i j])]
+    (pick-body! ant-ref body-below)))
+
+(defn drop-body-below!
+  [ant-ref]
+  (let [i (:y @ant-ref)
+        j (:x @ant-ref)
+        tile-ref (get-tile-ref dead-grid [i j])
+        body-ref (:carrying @ant-ref)]
+    (alter tile-ref assoc :occupied-by body-ref :is-busy true)
+    (alter body-ref assoc :x j :y i)
+    (alter ant-ref  assoc :carrying nil)))
+
+
 (defn decide-ant [ant-ref]    
   (dosync
    (let [i (:y @ant-ref)
@@ -193,14 +240,14 @@
          chance (rand)
          num-neighbors (count-body-neighbors [i j])] 
      (if is-carrying
-       (let [drop-chance (chance-to-drop num-neighbors)]
-         (if (and (not has-body-below)
-                  (>= drop-chance chance)) 
-           (drop-body-below! ant-ref)))
-       (let [pick-chance (chance-to-pick num-neighbors)]
-         (if (and has-body-below
-                  (>= (* pick-chance pick-chance) chance))
-           (pick-body-below! ant-ref)))))))
+       (if (not has-body-below)
+         (let [drop-chance (chance-to-drop num-neighbors)]
+           (if (>= drop-chance chance) 
+             (drop-body-below! ant-ref))))
+       (if has-body-below
+         (let [pick-chance (chance-to-pick num-neighbors)]
+           (if (>= (* pick-chance pick-chance) chance)
+             (pick-body-below! ant-ref))))))))
 
 (defn walk-ant [ant-ref]
   (dosync

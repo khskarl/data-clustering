@@ -33,9 +33,6 @@
 ;; Helpers ;;
 ;;;;;;;;;;;;;
 
-(defn get-class-indices [class-id]
-  (keep-indexed #(when (= class-id %2) %1) (get-classes)))
-
 ;;;;;;;;;;;;;;;
 ;; Interface ;;
 ;;;;;;;;;;;;;;;
@@ -44,6 +41,9 @@
 
 (defn get-classes []
   (:classes dataset))
+
+(defn get-class-indices [class-id]
+  (keep-indexed #(when (= class-id %2) %1) (get-classes)))
 
 (defn get-data-from-class [class-id]
   (mapv nth (repeat (get-data)) (get-class-indices class-id)))
@@ -77,12 +77,13 @@
 (defn inverse-concentration [num-neighbors]
   (- 1 (concentration num-neighbors)))
 
-;; Pick formula seems to be working well, I love you math :D
+;; Pick formula seems to be working well, thank you math! :D
 (defn chance-to-pick [data neighbors-data]
   (Math/abs (+ (data-dissimilarity data neighbors-data)
                (concentration (count neighbors-data))
                (- 1))))
 
+;; Drop formula seems to work? Thank you random tinkering :D
 (defn chance-to-drop [data neighbors-data]
   (- (data-similarity data neighbors-data)
      (inverse-concentration (count neighbors-data))))
@@ -99,9 +100,9 @@
 
 (doseq [n [0 2 4 6 8]]
   (println "\n" n)
-  (diagnostic-pick sample (take n class-1)))
+  (diagnostic-drop sample (take n class-1)))
 
 (doseq [n [0 2 4 6 8 ]]
   (println "\n" n)
-  (diagnostic-pick sample (take n class-2)))
+  (diagnostic-drop sample (take n class-2)))
 

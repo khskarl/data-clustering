@@ -30,7 +30,7 @@
 (def dimensions 400)
 (def tile-size (/ dimensions ac/dimension))
 (def half-tile-size (/ tile-size 2))
-(def iterations-per-frame 30)
+(def iterations-per-frame 100)
 
 (def current-iteration (atom 0))
 
@@ -50,7 +50,7 @@
 (defn draw-entity [position]
   (let [x (first position)
         y (second position)]
-    (q/ellipse x y tile-size tile-size)))
+    (q/ellipse x y (* tile-size 0.8) (* tile-size 0.8))))
 
 (defn draw-entities [positions]
   (run! draw-entity (map grid-to-screen positions)))
