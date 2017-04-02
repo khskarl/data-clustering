@@ -191,10 +191,10 @@
   (float (/ num-neighbors max-neighbors)))
 
 (defn chance-to-pick [body-data neighbors-data] 
-  (dataset/chance-to-pick body-data neighbors-data))
+  (dataset/chance-to-pick body-data neighbors-data max-neighbors))
 
 (defn chance-to-drop [body-data neighbors-data] 
-  (dataset/chance-to-drop body-data neighbors-data))
+  (dataset/chance-to-drop body-data neighbors-data max-neighbors))
 
 (defn move-ant!
   [ant-ref [dx dy]] 

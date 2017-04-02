@@ -30,7 +30,7 @@
 (def dimensions 400)
 (def tile-size (/ dimensions ac/dimension))
 (def half-tile-size (/ tile-size 2))
-(def iterations-per-frame 100)
+(def iterations-per-frame 1)
 
 (def current-iteration (atom 0))
 
@@ -78,8 +78,10 @@
   (q/rect 0 0 dimensions dimensions)
   (doall
    (map-indexed draw-body ac/bodies))
+
   (q/fill 230)
   (draw-entities (map entity-to-position ac/ants))
+
   (dotimes [_ iterations-per-frame]
     (swap! current-iteration inc)
     (ac/iterate-system))
