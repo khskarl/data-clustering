@@ -13,11 +13,10 @@
 ;; Grid, variables and movement ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(def dataset-path "datasets/Square1_DataSet_400itens.txt")
-(def dataset (dataset/load-dataset dataset-path))
+(def dataset         (dataset/load-dataset         dataset-path))
 (def dataset-classes (dataset/load-dataset-classes dataset-path))
 
-(def dimension 100)
+(def dimension 80)
 (def radius 2)
 (def num-ants 25)
 (def num-bodies (count dataset))
@@ -45,6 +44,10 @@
 
 (defn get-tile-ref [grid [i j]]
   (get-in grid [i j]))
+
+(defn get-tile [grid [i j]]
+  (deref (get-in grid [i j])))
+
 
 (defn is-tile-free? [grid [i j]]
   (= false (:is-busy (deref (get-tile-ref grid [i j])))))
@@ -151,8 +154,7 @@
                                                                  (compute-neighbors-indices [i j]))
                                                                (range dimension))))
                                           (range dimension))))
-(defn get-neighbors-indices
-  [[i j]]
+(defn get-neighbors-indices [[i j]]
   (get-in neighbors-indices [i j]))
 
 (defn has-reached-target? [ant-ref]
@@ -163,62 +165,26 @@
   (let [new-target (random-position)]
     (alter ant-ref assoc :tx (first new-target) :ty (second new-target))))
 
+(defn get-neighbors [[i j]]
+  (let [neighbors-indices (get-neighbors-indices [i j])
+        tiles (filter #(:is-busy (get-tile dead-grid %)) neighbors-indices)]
+    (map :occupied-by tiles)))
+
 (defn count-body-neighbors
   [[i j]]
-  (count (filter #(:is-busy (deref (get-tile-ref dead-grid %)))
+  (count (filter #(:is-busy (get-tile dead-grid %))
                  (get-neighbors-indices [i j]))))
 
-(defn chance-to-pick
-  [num-neighbors] 
-  (- 1 (float (/ num-neighbors max-neighbors))))
-
-(defn chance-to-drop
-  [num-neighbors] 
+(defn busy-ratio [num-neighbors]
   (float (/ num-neighbors max-neighbors)))
 
-(defn move-ant!
-  [ant-ref [dx dy]] 
-  (let [x (:x @ant-ref)
-        y (:y @ant-ref)
-        new-x (wrap (+ x dx))
-        new-y (wrap (+ y dy))]    
-    (if (has-reached-target? ant-ref)
-      (compute-new-target-position ant-ref))
-    (alter ant-ref assoc :x new-x :y new-y)))
+(defn chance-to-pick [num-neighbors] 
+  (- 1 (busy-ratio num-neighbors)))
 
-(defn pick-body!
-  [ant-ref body-ref]
-  (let [i (:y @body-ref)
-        j (:x @body-ref)
-        tile-ref (get-tile-ref dead-grid [i j])] 
-    (alter tile-ref assoc :occupied-by nil :is-busy false)
-    (alter body-ref assoc :x dimension :y dimension)
-    (alter ant-ref  assoc :carrying body-ref)))
+(defn chance-to-drop [num-neighbors] 
+  (busy-ratio num-neighbors))
 
-(defn pick-body-below!
-  [ant-ref]
-  (let [i (:y @ant-ref)
-        j (:x @ant-ref)
-        body-below (get-body-ref-in-pos [i j])]
-    (pick-body! ant-ref body-below)))
-
-(defn drop-body-below!
-  [ant-ref]
-  (let [i (:y @ant-ref)
-        j (:x @ant-ref)
-        tile-ref (get-tile-ref dead-grid [i j])
-        body-ref (:carrying @ant-ref)]
-    ;; (println "Drop body!")
-    (alter tile-ref assoc :occupied-by body-ref :is-busy true)
-    (alter body-ref assoc :x j :y i)
-    (alter ant-ref  assoc :carrying nil)))
-
-;; TODO: Maybe change Ants to agents (or something else) so it can be used outside a dosync
-;; TODO: read more about paralellism in clojure
-;; TODO: check rich's ants
-
-(defn decide-ant
-  [ant-ref]   
+(defn decide-ant [ant-ref]    
   (dosync
    (let [i (:y @ant-ref)
          j (:x @ant-ref)
@@ -245,5 +211,4 @@
 (defn iterate-system [] 
   (doall (pmap walk-ant ants))
   (doall (pmap decide-ant ants)))
-
 

@@ -27,7 +27,7 @@
 
 
 
-(def dimensions 500)
+(def dimensions 400)
 (def tile-size (/ dimensions ac/dimension))
 (def half-tile-size (/ tile-size 2))
 (def iterations-per-frame 30)
@@ -39,7 +39,6 @@
                    [80  230   80]
                    [50 150 220]
                    [210 150 210]])
-
 
 (defn discrete-to-screen [x]
   (+ (* tile-size x) half-tile-size))
@@ -63,7 +62,6 @@
   (let [x (discrete-to-screen (:x @body-ref))
         y (discrete-to-screen (:y @body-ref))
         class (nth ac/dataset-classes id)]
-    ;; (println (nth class-colors class))
     (apply q/fill (nth class-colors class))
     (q/ellipse x y tile-size tile-size)))
 
@@ -78,7 +76,6 @@
   (q/background 20)
   (q/fill 20 20 20 40)
   (q/rect 0 0 dimensions dimensions)
-  (q/fill 90)
   (doall (map-indexed draw-body ac/bodies))
   (q/fill 230)
   (draw-entities (map entity-to-position ac/ants))
@@ -86,8 +83,6 @@
     (swap! current-iteration inc)
     (ac/iterate-system))
 
-  ;; (draw-gaussian)
-  
   (q/fill 255)
   (q/text (str (q/current-frame-rate)) 0 dimensions)
   (q/text (str @current-iteration) 0 (- dimensions 10))  
