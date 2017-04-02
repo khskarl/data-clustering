@@ -1,10 +1,13 @@
-(ns ant-clustering.dataset)
+(ns ant-clustering.dataset
+  (:require [ant-clustering.ant-clustering :as ac :refer [max-neighbors]]
+            ))
 
 ;;;;;;;;;;;;;;;;;;;;;
 ;; Dataset loading ;;
 ;;;;;;;;;;;;;;;;;;;;;
 
 (def dataset-path "datasets/Square1_DataSet_400itens.txt")
+;; (def dataset-path "datasets/R15.txt")
 (def regex-dataset  #"(\-?[\d]+[,.][\d]+)\t(\-?[\d]+[,.][\d]+)\t(\d)")
 
 (defn file-to-lines [filepath]
@@ -56,8 +59,8 @@
 (def class-3 (get-data-from-class 3))
 (def class-4 (get-data-from-class 4))
 
-(def max-neighbors 8)
-(def max-distance 50)
+;; (def max-neighbors 8)
+(def max-distance 25)
 
 (defn euclidean-distance [a b]  
   (Math/sqrt (reduce + (map #(* %1 %1) (map - a b)))))
@@ -69,7 +72,8 @@
        max-distance)))
 
 (defn data-similarity [data neighbors-data]
-  (- 1 (data-dissimilarity data neighbors-data)))
+  (- 1  (* (data-dissimilarity data neighbors-data)
+           (data-dissimilarity data neighbors-data) )))
 
 (defn concentration [num-neighbors]
   (float (/ num-neighbors max-neighbors)))
@@ -79,9 +83,10 @@
 
 ;; Pick formula seems to be working well, thank you math! :D
 (defn chance-to-pick [data neighbors-data]
-  (Math/abs (+ (data-dissimilarity data neighbors-data)
-               (concentration (count neighbors-data))
-               (- 1))))
+  (let [value (Math/abs (+ (data-dissimilarity data neighbors-data)
+                           (concentration (count neighbors-data))
+                           (- 1)))]
+    (* value 1)))
 
 ;; Drop formula seems to work? Thank you random tinkering :D
 (defn chance-to-drop [data neighbors-data]
@@ -89,20 +94,21 @@
      (inverse-concentration (count neighbors-data))))
 
 (defn diagnostic-pick [data neighbors-data]
-  (println "dissimilarity: " (data-dissimilarity data neighbors-data)
-           "\nconcentration: " (concentration (count neighbors-data))
-           "\n  pick chance: " (chance-to-pick data neighbors-data)) )
+  (println "dissimilarity:" (data-dissimilarity data neighbors-data)
+           "\nconcentration:" (concentration (count neighbors-data))
+           "\npick chance:  " (chance-to-pick data neighbors-data)
+           "\ndrop chance:  " (chance-to-drop data neighbors-data) ))
 
 (defn diagnostic-drop [data neighbors-data]
-  (println "   similarity: " (data-similarity data neighbors-data)
-           "\nconcentration: " (concentration (count neighbors-data))
-           "\n  drop chance: " (chance-to-drop data neighbors-data)) )
+  (println "similarity:   " (data-similarity data neighbors-data)
+           "\nconcentration:" (concentration (count neighbors-data))
+           "\ndrop chance:  " (chance-to-drop data neighbors-data)) )
 
 (doseq [n [0 2 4 6 8]]
   (println "\n" n)
-  (diagnostic-drop sample (take n class-1)))
+  (diagnostic-pick sample (take n class-1)))
 
 (doseq [n [0 2 4 6 8 ]]
   (println "\n" n)
-  (diagnostic-drop sample (take n class-2)))
+  (diagnostic-pick sample (take n class-2)))
 

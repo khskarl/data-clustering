@@ -16,7 +16,8 @@
 (def dataset-classes (dataset/get-classes))
 
 (def dimension 80)
-(def radius 2)
+(def radius 1)
+(def max-neighbors (dec (* (inc (* 2 radius)) (inc (* 2 radius)))))
 (def num-ants 25)
 (def num-bodies (count dataset-data))
 
@@ -103,7 +104,6 @@
                 (conj new-ants (create-ant [i j]))))))))
 
 
-(def max-neighbors (dec (* (inc (* 2 radius)) (inc (* 2 radius)))))
 (def ants (create-ants num-ants))
 
 ;; Bodies
@@ -174,11 +174,13 @@
         tiles (filter #(:is-busy (get-tile dead-grid %)) neighbors-indices)]
     (map #(:occupied-by (get-tile dead-grid %)) tiles)))
 
+
+(defn get-body-data [body-ref]
+  (nth dataset-data (:id @body-ref)))
+
 (defn get-neighbors-data [[i j]]
   (let [neighbors (get-neighbors [i j])]
-    (map #(nth dataset-data (:id (deref %))) neighbors)))
-
-
+    (map get-body-data neighbors)))
 
 (defn count-body-neighbors
   [[i j]]
@@ -188,11 +190,11 @@
 (defn busy-ratio [num-neighbors]
   (float (/ num-neighbors max-neighbors)))
 
-(defn chance-to-pick [num-neighbors] 
-  (- 1 (busy-ratio num-neighbors)))
+(defn chance-to-pick [body-data neighbors-data] 
+  (dataset/chance-to-pick body-data neighbors-data))
 
-(defn chance-to-drop [num-neighbors] 
-  (busy-ratio num-neighbors))
+(defn chance-to-drop [body-data neighbors-data] 
+  (dataset/chance-to-drop body-data neighbors-data))
 
 (defn move-ant!
   [ant-ref [dx dy]] 
@@ -230,7 +232,6 @@
     (alter body-ref assoc :x j :y i)
     (alter ant-ref  assoc :carrying nil)))
 
-
 (defn decide-ant [ant-ref]    
   (dosync
    (let [i (:y @ant-ref)
@@ -238,14 +239,17 @@
          has-body-below (has-body-below-ant? @ant-ref)
          is-carrying (is-ant-carrying? @ant-ref)
          chance (rand)
-         num-neighbors (count-body-neighbors [i j])] 
+         neighbors-data (get-neighbors-data [i j])] 
      (if is-carrying
        (if (not has-body-below)
-         (let [drop-chance (chance-to-drop num-neighbors)]
+         (let [body-data (get-body-data (:carrying @ant-ref))
+               drop-chance (chance-to-drop body-data neighbors-data)]
            (if (>= drop-chance chance) 
              (drop-body-below! ant-ref))))
        (if has-body-below
-         (let [pick-chance (chance-to-pick num-neighbors)]
+         (let [body-below (get-body-ref-in-pos [i j])
+               body-data (get-body-data body-below)
+               pick-chance (chance-to-pick body-data neighbors-data)]
            (if (>= (* pick-chance pick-chance) chance)
              (pick-body-below! ant-ref))))))))
 

@@ -34,11 +34,11 @@
 
 (def current-iteration (atom 0))
 
-(def class-colors [[128 128 128] 
-                   [220 50    30]
-                   [80  230   80]
-                   [50 150 220]
-                   [210 150 210]])
+(def class-colors [0xff808080
+                   0xffDC143C 0xff9ACD32 0xff3296DC 0xff9932CC
+                   0xffFF0000 0xff00FF00 0xff0000FF 0xffFFFF00
+                   0xffAA0000 0xff00AA00 0xff0000AA 0xff00FFFF
+                   0xff660000 0xff006600 0xff000066 0xff660066])
 
 (defn discrete-to-screen [x]
   (+ (* tile-size x) half-tile-size))
@@ -62,7 +62,7 @@
   (let [x (discrete-to-screen (:x @body-ref))
         y (discrete-to-screen (:y @body-ref))
         class (nth ac/dataset-classes id)]
-    (apply q/fill (nth class-colors class))
+    (q/fill (nth class-colors class))
     (q/ellipse x y tile-size tile-size)))
 
 (defn setup []
@@ -73,10 +73,11 @@
   (q/text-font (q/create-font "DejaVu Sans" 10 true)))
 
 (defn draw []
-  (q/background 20)
-  (q/fill 20 20 20 40)
+  ;; (q/background 20)
+  (q/fill 20 20 20 10)
   (q/rect 0 0 dimensions dimensions)
-  (doall (map-indexed draw-body ac/bodies))
+  (doall
+   (map-indexed draw-body ac/bodies))
   (q/fill 230)
   (draw-entities (map entity-to-position ac/ants))
   (dotimes [_ iterations-per-frame]
