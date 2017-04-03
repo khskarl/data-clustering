@@ -4,10 +4,10 @@
             clojure.pprint 
             [taoensso.tufte :as tufte :refer (defnp p profiled profile)]))
 
-;; 1) Fazer leitura dos dados pra formiguinhas mortas
-;; 2) Jogar formiguinhas mortas no mapa
-;; 3) Tomada de decisão (problema)
-;; 4) Ajuste de parâmetros
+;; 1) [x] Fazer leitura dos dados pra formiguinhas mortas
+;; 2) [x] Jogar formiguinhas mortas no mapa
+;; 3) [x] Tomada de decisão (problema)
+;; 4) [ ] Ajuste de parâmetros
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Grid, variables and movement ;;
@@ -38,6 +38,11 @@
 
 (defn random-position []
   [(random-in-dimension) (random-in-dimension)])
+
+;; TODO: Implement smoothing f(t) = sin(3.2t - 1.6)/2 + 0.5
+;; \left(\frac{\sin \left(t\cdot 3.2\ -1.6\right)}{2}\ +\ 0.5\right)
+(defn random-normalized []
+  (rand))
 
 (defn wrap [x]
   (mod x dimension))
@@ -238,7 +243,7 @@
          j (:x @ant-ref)
          has-body-below (has-body-below-ant? @ant-ref)
          is-carrying (is-ant-carrying? @ant-ref)
-         chance (rand)
+         chance (random-normalized)
          neighbors-data (get-neighbors-data [i j])] 
      (if is-carrying
        (if (not has-body-below)

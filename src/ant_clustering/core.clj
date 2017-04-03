@@ -25,12 +25,10 @@
 ;;             y (* (normal-distribution t))]
 ;;         (q/ellipse (* x 400) (- (* y 400)) 2 2)))))
 
-
-
 (def dimensions 400)
 (def tile-size (/ dimensions ac/dimension))
 (def half-tile-size (/ tile-size 2))
-(def iterations-per-frame 1)
+(def iterations-per-frame 100)
 
 (def current-iteration (atom 0))
 
@@ -65,6 +63,7 @@
     (q/fill (nth class-colors class))
     (q/ellipse x y tile-size tile-size)))
 
+
 (defn setup []
   (q/background 20 20 20 20)
   (q/stroke-weight 0)
@@ -73,14 +72,15 @@
   (q/text-font (q/create-font "DejaVu Sans" 10 true)))
 
 (defn draw []
-  ;; (q/background 20)
+  (println (q/random-gaussian))
+  (q/background 20)
   (q/fill 20 20 20 10)
   (q/rect 0 0 dimensions dimensions)
   (doall
    (map-indexed draw-body ac/bodies))
 
   (q/fill 230)
-  (draw-entities (map entity-to-position ac/ants))
+  ;; (draw-entities (map entity-to-position ac/ants))
 
   (dotimes [_ iterations-per-frame]
     (swap! current-iteration inc)

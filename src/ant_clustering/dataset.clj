@@ -1,12 +1,13 @@
-(ns ant-clustering.dataset)
+(ns ant-clustering.dataset
+  (:require clojure.pprint))
 
 ;;;;;;;;;;;;;;;;;;;;;
 ;; Dataset loading ;;
 ;;;;;;;;;;;;;;;;;;;;;
 
-(def dataset-path "datasets/Square1_DataSet_400itens.txt")
-;; (def dataset-path "datasets/R15.txt")
-(def regex-dataset  #"(\-?[\d]+[,.][\d]+)\t(\-?[\d]+[,.][\d]+)\t(\d)")
+;;(def dataset-path "datasets/Square1_DataSet_400itens.txt")
+(def dataset-path "datasets/R15.txt")
+(def regex-dataset  #"(\-?[\d]+[,.][\d]+)\t(\-?[\d]+[,.][\d]+)\t(\d+)")
 
 (defn file-to-lines [filepath]
   (with-open [rdr (clojure.java.io/reader filepath)]
@@ -56,9 +57,6 @@
 (def class-2 (get-data-from-class 2))
 (def class-3 (get-data-from-class 3))
 (def class-4 (get-data-from-class 4))
-
-;; (def max-neighbors 8)
-(def max-distance 25)
 
 (defn euclidean-distance [a b]  
   (Math/sqrt (reduce + (map #(* %1 %1) (map - a b)))))
