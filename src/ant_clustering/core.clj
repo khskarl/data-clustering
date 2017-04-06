@@ -38,6 +38,12 @@
                    0xffAA0000 0xff00AA00 0xff0000AA 0xff00FFFF
                    0xff660000 0xff006600 0xff000066 0xff660066])
 
+(defn class-colors-lazy
+  ([] (class-colors-lazy 0))
+  ([hue] (lazy-seq (cons [(mod hue 255) 200 230 255] (class-colors-lazy (+ hue 17))))))
+
+(nth (class-colors-lazy) 15)
+
 (defn discrete-to-screen [x]
   (+ (* tile-size x) half-tile-size))
 
@@ -60,7 +66,8 @@
   (let [x (discrete-to-screen (:x @body-ref))
         y (discrete-to-screen (:y @body-ref))
         class (nth ac/dataset-classes id)]
-    (q/fill (nth class-colors class))
+    (q/fill (nth class-colors class)) 
+    ;;(apply q/fill (nth (class-colors-lazy) class))
     (q/ellipse x y tile-size tile-size)))
 
 
@@ -69,10 +76,12 @@
   (q/stroke-weight 0)
   (q/smooth)
   (q/frame-rate 60)
-  (q/text-font (q/create-font "DejaVu Sans" 10 true)))
+  (q/text-font (q/create-font "DejaVu Sans" 10 true))
+  ;;(q/color-mode :hsb)
+  )
 
 (defn draw []
-  (println (q/random-gaussian))
+  
   (q/background 20)
   (q/fill 20 20 20 10)
   (q/rect 0 0 dimensions dimensions)
@@ -80,15 +89,22 @@
    (map-indexed draw-body ac/bodies))
 
   (q/fill 230)
-  ;; (draw-entities (map entity-to-position ac/ants))
+  (draw-entities (map entity-to-position ac/ants))
+
+  (if (= 0 (mod @current-iteration 25000))
+    (q/save-frame
+     (str "screenshots/" (apply max ac/dataset-classes) "_" @current-iteration ".png"))) 
+  
+  
+
+  (q/fill 255)
+  (q/text (str (q/current-frame-rate)) 0 dimensions)
+  (q/text (str @current-iteration) 0 (- dimensions 10))
 
   (dotimes [_ iterations-per-frame]
     (swap! current-iteration inc)
     (ac/iterate-system))
 
-  (q/fill 255)
-  (q/text (str (q/current-frame-rate)) 0 dimensions)
-  (q/text (str @current-iteration) 0 (- dimensions 10))  
   )
 
 

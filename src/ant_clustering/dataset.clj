@@ -5,8 +5,8 @@
 ;; Dataset loading ;;
 ;;;;;;;;;;;;;;;;;;;;;
 
-;;(def dataset-path "datasets/Square1_DataSet_400itens.txt")
-(def dataset-path "datasets/R15.txt")
+(def dataset-path "datasets/Square1_DataSet_400itens.txt")
+;;(def dataset-path "datasets/R15.txt")
 (def regex-dataset  #"(\-?[\d]+[,.][\d]+)\t(\-?[\d]+[,.][\d]+)\t(\d+)")
 
 (defn file-to-lines [filepath]
@@ -31,6 +31,8 @@
 
 (def dataset (load-dataset dataset-path))
 
+(count (:data dataset))
+
 ;;;;;;;;;;;;;
 ;; Helpers ;;
 ;;;;;;;;;;;;;
@@ -38,6 +40,10 @@
 ;;;;;;;;;;;;;;;
 ;; Interface ;;
 ;;;;;;;;;;;;;;;
+
+(def max-distance 25)
+;;(def max-distance 1.0)
+
 (defn get-data []
   (:data dataset))
 
