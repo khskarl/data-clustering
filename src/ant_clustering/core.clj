@@ -82,18 +82,19 @@
 
 (defn draw []
   
-  (q/background 20)
+  ;;(q/background 20)
   (q/fill 20 20 20 10)
   (q/rect 0 0 dimensions dimensions)
   (doall
    (map-indexed draw-body ac/bodies))
 
   (q/fill 230)
-  (draw-entities (map entity-to-position ac/ants))
+  ;; (draw-entities (map entity-to-position ac/ants))
 
-  (if (= 0 (mod @current-iteration 25000))
-    (q/save-frame
-     (str "screenshots/" (apply max ac/dataset-classes) "_" @current-iteration ".png"))) 
+  ;; (if (= 0 (mod @current-iteration 25000))
+  ;;   (q/save-frame
+  ;;    (str "screenshots/" (apply max ac/dataset-classes) "_" @current-iteration ".png")))
+  
   
   
 
